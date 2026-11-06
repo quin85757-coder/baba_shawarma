@@ -9,9 +9,12 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "appwrite": "^29.1.0",
     "next": "16.4.2",
+    "node-appwrite": "^31.0.0",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "zustand": "^5.0.16"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
