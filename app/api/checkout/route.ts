@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Build the signed PayFast form
-        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL!;
+            const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || req.nextUrl.origin;
         const notifyBase = process.env.PAYFAST_NOTIFY_BASE_URL || siteUrl;
 
         const pairs: Pairs = ([
