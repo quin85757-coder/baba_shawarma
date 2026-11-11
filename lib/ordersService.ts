@@ -94,7 +94,7 @@ export const addFavorite = async (
       categoryName: m.categoryName,
       price: m.price,
       image_url: m.image_url,
-      rating: m.rating ?? 0,
+      ...(m.rating ? { rating: m.rating } : {}),
     },
   });
 };

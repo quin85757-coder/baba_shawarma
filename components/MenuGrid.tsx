@@ -57,7 +57,7 @@ export default function MenuGrid({ items }: { items: any[] }) {
                     categoryName: m.category_name ?? "",
                     price: Number(m.price),
                     image_url: m.image_url ?? "",
-                    rating: Number(m.rating ?? 0),
+                    rating: m.rating ? Number(m.rating) : undefined,
                 });
                 setFavMap((p) => ({ ...p, [m.$id]: doc.$id }));
             } catch {
