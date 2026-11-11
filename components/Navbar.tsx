@@ -13,6 +13,7 @@ const STAFF_LINKS = [
 const ADMIN_LINKS = [
   { href: "/admin/people", label: "People" },
   { href: "/admin/activity", label: "Activity" },
+  { href: "/admin/settings", label: "Settings" },
 ];
 
 export default function Navbar() {

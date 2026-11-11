@@ -19,6 +19,7 @@ const LABELS: Record<string, string> = {
   driver_assigned: "Assigned a driver",
   account_disabled: "Disabled an account",
   account_enabled: "Enabled an account",
+  settings_updated: "Changed restaurant settings",
 };
 
 export default function ActivityPage() {
