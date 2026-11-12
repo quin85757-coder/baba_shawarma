@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "node-appwrite": ["./lib/server/appwrite-rest.ts"]
     }
   },
   "include": [
