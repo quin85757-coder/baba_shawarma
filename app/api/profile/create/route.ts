@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Permission, Role } from "node-appwrite";
 import { adminDb, DB } from "@/lib/server/appwrite-admin";
-import { clean, fail, findProfile, verifyJwt } from "@/lib/server/auth";
+import { clean, fail, findProfile, roleFromLabels, verifyJwt } from "@/lib/server/auth";
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,6 +13,7 @@ export async function POST(req: NextRequest) {
     if (existing) return NextResponse.json({ user: existing });
 
     const name = clean(body.name, 100) || clean(acc.name, 100) || "Customer";
+    const role = roleFromLabels(acc.labels ?? []);
 
     try {
       const user = await adminDb.createDocument({
@@ -27,13 +28,9 @@ export async function POST(req: NextRequest) {
           phone: clean(body.phone, 30),
           address1: clean(body.address1, 300),
           address2: clean(body.address2, 300),
-          role: (acc.labels ?? []).includes("admin")
-          ? "admin"
-          : (acc.labels ?? []).includes("staff")
-          ? "staff"
-          : (acc.labels ?? []).includes("driver")
-          ? "driver"
-          : "customer",
+          role,
+          // Customers see the welcome screens once. Staff and drivers don't need them.
+          onboarded: role !== "customer",
         },
         // The owner can READ their row. They cannot edit or delete it.
         permissions: [Permission.read(Role.user(acc.$id))],

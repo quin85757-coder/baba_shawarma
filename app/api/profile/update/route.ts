@@ -14,9 +14,9 @@ function validAvatar(v: unknown): string {
   }
   const cloud = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
   const ok =
-    u.protocol === "https:" &&
-    u.hostname === "res.cloudinary.com" &&
-    (!cloud || u.pathname.startsWith(`/${cloud}/`));
+      u.protocol === "https:" &&
+      u.hostname === "res.cloudinary.com" &&
+      (!cloud || u.pathname.startsWith(`/${cloud}/`));
   if (!ok) throw new HttpError(400, "Please upload a picture through the app.");
   return u.toString();
 }
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     const caller = await getCaller(body.jwt);
 
     // Only these fields can ever change. role, email and accountId cannot.
-    const data: Record<string, string> = {};
+    const data: Record<string, string | boolean> = {};
 
     if (body.name !== undefined) {
       const name = clean(body.name, MAX.name);
@@ -41,6 +41,8 @@ export async function POST(req: NextRequest) {
       data.avatar = validAvatar(body.avatar);
       data.avatar_public_id = clean(body.avatar_public_id, 200);
     }
+    // A customer can only ever mark the welcome as seen, never reset it
+    if (body.onboarded === true) data.onboarded = true;
 
     if (Object.keys(data).length === 0) throw new HttpError(400, "Nothing to update.");
 

@@ -29,6 +29,7 @@ export interface AppUser {
   address2?: string;
   role?: string;
   accountId: string;
+  onboarded?: boolean;
 }
 
 // Calls our own server with the signed-in user's JWT attached
