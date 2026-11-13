@@ -14,6 +14,7 @@ const ADMIN_LINKS = [
   { href: "/admin/people", label: "People" },
   { href: "/admin/activity", label: "Activity" },
   { href: "/admin/settings", label: "Settings" },
+  { href: "/admin/promos", label: "Promotions" },
 ];
 
 export default function Navbar() {

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import MenuGrid from "@/components/MenuGrid";
 import { getCategories, getMenu } from "@/lib/ordersService";
 import { RESTAURANT } from "@/lib/restaurant";
+import PromoBanners from "@/components/PromoBanners";
 
 export default function Home() {
   const [categories, setCategories] = useState<any[]>([]);
@@ -43,7 +44,7 @@ export default function Home() {
             </a>
           </div>
         </section>
-
+        <PromoBanners />
         {/* Info strip */}
         <section className="grid gap-4 md:grid-cols-3">
           {[

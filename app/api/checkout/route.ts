@@ -8,16 +8,22 @@ import { buildQuote } from "@/lib/server/pricing";
 
 export async function POST(req: NextRequest) {
     try {
-        const { jwt, items, deliveryType, address, notes, lat, lng } = await req.json();
+        const { jwt, items, deliveryType, address, notes, lat, lng, promoCode, expectedTotal } = await req.json();
         const caller = await getCaller(jwt);
         if (caller.isStaff) {
             throw new HttpError(403, "Staff and admin accounts can't place orders. Please use a customer account.");
         }
 
         // The same function the checkout screen used to show the price
-        const q = await buildQuote({ items, deliveryType, address, lat, lng });
+        const q = await buildQuote({ items, deliveryType, address, lat, lng, userId: caller.userDoc.$id, promoCode });
         if (q.blocked) throw new HttpError(409, q.blocked);
         if (q.total < 1) throw new HttpError(400, "Invalid total");
+
+        // If the price moved since the customer saw it (an offer expired, a price changed), stop and tell them
+        const expected = Number(expectedTotal);
+        if (Number.isFinite(expected) && Math.abs(expected - q.total) > 0.01) {
+            throw new HttpError(409, `The price changed to R${q.total.toFixed(2)}. Please review your order and try again.`);
+        }
 
         // The customer may READ their own order. Nobody can edit it.
         const ownerRead = [Permission.read(Role.user(caller.accountId))];
@@ -42,6 +48,7 @@ export async function POST(req: NextRequest) {
                 deliveryLat: q.drop?.lat ?? null,
                 deliveryLng: q.drop?.lng ?? null,
                 specialInstructions: String(notes ?? "").slice(0, 300),
+                ...(q.promo ? { promoId: q.promo.id, promoCode: q.promo.code, promoTitle: q.promo.title } : {}),
             },
             permissions: ownerRead,
         });

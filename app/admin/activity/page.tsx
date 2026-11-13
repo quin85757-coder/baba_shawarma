@@ -20,6 +20,8 @@ const LABELS: Record<string, string> = {
   account_disabled: "Disabled an account",
   account_enabled: "Enabled an account",
   settings_updated: "Changed restaurant settings",
+  promo_saved: "Saved a promotion",
+  promo_deleted: "Deleted a promotion",
 };
 
 export default function ActivityPage() {

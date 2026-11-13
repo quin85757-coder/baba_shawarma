@@ -1,7 +1,9 @@
 import { Query } from "node-appwrite";
 import { adminDb, DB } from "@/lib/server/appwrite-admin";
 import { HttpError } from "@/lib/server/auth";
+import { fetchAll } from "@/lib/server/fetchAll";
 import { RESTAURANT_COORDS, distanceKm, geocode, inSouthAfrica, round1 } from "@/lib/server/geo";
+import { evaluateOffers } from "@/lib/server/promos";
 import { deliveryFeeFor, getSettings, openStatus } from "@/lib/server/settings";
 
 export interface Line {
@@ -25,9 +27,36 @@ export interface Quote {
     warnings: string[];
     blocked: string | null; // set when the order can't be placed, with the reason to show
     prepMinutes: number;
+    promo: { id: string; code: string; title: string; discount: number } | null;
+    promoMessage: string | null;
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
+
+// Every size for these menu items, in as few calls as possible
+async function sizesByMenu(ids: string[]): Promise<Map<string, any[]>> {
+    const out = new Map<string, any[]>(ids.map((id) => [id, []]));
+    try {
+        const rows = await fetchAll("size", [Query.equal("menu", ids)], 600);
+        if (rows.length === 0) throw new Error("empty");
+        for (const r of rows) {
+            const mid = typeof r.menu === "string" ? r.menu : r.menu?.$id;
+            if (mid && out.has(mid)) out.get(mid)!.push(r);
+        }
+        return out;
+    } catch {
+        // Fall back to one lookup per item
+        for (const id of ids) {
+            const r = await adminDb.listDocuments({
+                databaseId: DB.database,
+                collectionId: "size",
+                queries: [Query.equal("menu", id), Query.limit(50)],
+            });
+            out.set(id, r.documents as any[]);
+        }
+        return out;
+    }
+}
 
 export async function buildQuote(input: {
     items: unknown;
@@ -35,6 +64,8 @@ export async function buildQuote(input: {
     address: unknown;
     lat: unknown;
     lng: unknown;
+    userId: string;
+    promoCode?: unknown;
 }): Promise<Quote> {
     const { items, deliveryType } = input;
     if (!Array.isArray(items) || items.length === 0) throw new HttpError(400, "Cart is empty");
@@ -44,6 +75,19 @@ export async function buildQuote(input: {
     const settings = await getSettings();
 
     // 1. Re-price every item from the database, by size (never trust the client)
+    const ids = [...new Set(items.map((i: any) => String(i?.id ?? "")))].filter(Boolean);
+    if (ids.length === 0) throw new HttpError(400, "Invalid cart");
+
+    const [menuRes, sizeMap] = await Promise.all([
+        adminDb.listDocuments({
+            databaseId: DB.database,
+            collectionId: DB.menu,
+            queries: [Query.equal("$id", ids), Query.limit(100)],
+        }),
+        sizesByMenu(ids),
+    ]);
+    const menuById = new Map<string, any>((menuRes.documents as any[]).map((m) => [m.$id, m]));
+
     const lines: Line[] = [];
     let subtotal = 0;
     let itemCount = 0;
@@ -52,28 +96,19 @@ export async function buildQuote(input: {
         const quantity = Number(it?.quantity);
         if (!Number.isInteger(quantity) || quantity < 1 || quantity > 50) throw new HttpError(400, "Invalid quantity");
 
-        let menu: any;
-        try {
-            menu = await adminDb.getDocument({ databaseId: DB.database, collectionId: DB.menu, documentId: String(it.id) });
-        } catch {
-            throw new HttpError(400, "An item in your cart is no longer on the menu. Please remove it and try again.");
-        }
+        const menu = menuById.get(String(it?.id));
+        if (!menu) throw new HttpError(400, "An item in your cart is no longer on the menu. Please remove it and try again.");
 
-        const sizes = await adminDb.listDocuments({
-            databaseId: DB.database,
-            collectionId: "size",
-            queries: [Query.equal("menu", menu.$id), Query.limit(50)],
-        });
-
-        const wanted = String(it.selectedSize || "Regular");
-        const match = (sizes.documents as any[]).find((s) => String(s.label).toLowerCase() === wanted.toLowerCase());
+        const sizes = sizeMap.get(menu.$id) ?? [];
+        const wanted = String(it?.selectedSize || "Regular");
+        const match = sizes.find((s) => String(s.label).toLowerCase() === wanted.toLowerCase());
 
         let price: number;
         let label = wanted;
         if (match) {
             price = Number(match.price);
             label = String(match.label);
-        } else if (sizes.documents.length === 0 || wanted.toLowerCase() === "regular") {
+        } else if (sizes.length === 0 || wanted.toLowerCase() === "regular") {
             price = Number(menu.price);
         } else {
             throw new HttpError(400, `Size "${wanted}" is not available for ${menu.name}`);
@@ -126,8 +161,12 @@ export async function buildQuote(input: {
         }
     }
 
-    // 4. Discounts arrive with the promotions phase
-    const discount = 0;
+    // 4. Promotions: the best single offer for this customer and basket
+    const offers = await evaluateOffers(
+        { userId: input.userId, subtotal, deliveryFee, deliveryType },
+        String(input.promoCode ?? "")
+    );
+    const discount = offers.applied?.discount ?? 0;
 
     return {
         lines,
@@ -142,5 +181,14 @@ export async function buildQuote(input: {
         warnings,
         blocked,
         prepMinutes: settings.prepMinutes,
+        promo: offers.applied
+            ? {
+                id: offers.applied.promo.id,
+                code: offers.applied.promo.code,
+                title: offers.applied.promo.title,
+                discount,
+            }
+            : null,
+        promoMessage: offers.message,
     };
 }
